@@ -1,36 +1,47 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { pageview } from '@/lib/gtag';
 import { authConfig } from '@/lib/config/auth';
 
 export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
-
-  if (request.nextUrl.pathname.startsWith('/api')) {
-    requestHeaders.set('x-custom-header', 'api-request');
-  }
-
-  if (request.nextUrl.pathname !== '/_next/static' && 
-      request.nextUrl.pathname !== '/favicon.ico' &&
-      !request.nextUrl.pathname.includes('.')) {
-    pageview(request.nextUrl.pathname);
-  }
-
-  const isAuth = request.cookies.has('auth-token');
   const currentPath = request.nextUrl.pathname;
 
+  if (currentPath.startsWith('/api')) {
+    requestHeaders.set('x-custom-header', 'api-request');
+    
+    const accessToken = request.cookies.get('accessToken');
+    if (accessToken) {
+      requestHeaders.set('Authorization', `Bearer ${accessToken.value}`);
+    }
+    
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
+  }
+
+  if (currentPath.startsWith('/_next') || 
+      currentPath.startsWith('/favicon') ||
+      currentPath.includes('.')) {
+    return NextResponse.next();
+  }
+
+  const hasAccessToken = request.cookies.has('accessToken');
+
   const isProtectedPage = authConfig.protectedPages.some(
-    (path) => currentPath.startsWith(path)
+    (path: string) => currentPath.startsWith(path)
   );
+  
   const isAuthPage = authConfig.publicPages.some(
-    (path) => currentPath.startsWith(path)
+    (path: string) => path !== '/' && currentPath.startsWith(path)
   );
 
-  if (!isAuth && isProtectedPage) {
+  if (!hasAccessToken && isProtectedPage) {
     return NextResponse.redirect(new URL(authConfig.signInPage, request.url));
   }
 
-  if (isAuth && isAuthPage) {
+  if (hasAccessToken && isAuthPage) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -42,5 +53,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg).*)',
+  ],
 }; 
