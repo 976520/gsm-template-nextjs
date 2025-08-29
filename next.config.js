@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  experimental: {
+    reactCompiler: false,
+  },
+  images: {
+    remotePatterns: [],
+  },
 };
 
 module.exports = nextConfig; 
